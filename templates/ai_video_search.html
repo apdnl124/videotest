@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎬 AI 동영상 검색 시스템</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; background: white; border-radius: 15px; box-shadow: 0 20px 40px rgba(0,0,0,0.1); overflow: hidden; }
+        .header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 30px; text-align: center; }
+        .header h1 { font-size: 2.5em; margin-bottom: 10px; }
+        .header p { font-size: 1.1em; opacity: 0.9; }
+        .main-content { padding: 30px; }
+        .tabs { display: flex; margin-bottom: 30px; border-bottom: 2px solid #f0f0f0; }
+        .tab { padding: 15px 30px; cursor: pointer; border: none; background: none; font-size: 1.1em; color: #666; border-bottom: 3px solid transparent; transition: all 0.3s ease; }
+        .tab.active { color: #4facfe; border-bottom-color: #4facfe; }
+        .tab:hover { color: #4facfe; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        .upload-section { text-align: center; margin-bottom: 40px; }
+        .upload-area { border: 3px dashed #ddd; border-radius: 10px; padding: 40px; margin: 20px 0; transition: all 0.3s ease; cursor: pointer; }
+        .upload-area:hover, .upload-area.dragover { border-color: #4facfe; background-color: #f8f9ff; }
+        .upload-icon { font-size: 3em; color: #ddd; margin-bottom: 20px; }
+        .upload-text { font-size: 1.2em; color: #666; margin-bottom: 20px; }
+        .file-input { display: none; }
+        .btn { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; border: none; padding: 12px 30px; border-radius: 25px; font-size: 1em; cursor: pointer; transition: all 0.3s ease; margin: 10px; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(79, 172, 254, 0.4); }
+        .btn:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-success { background: linear-gradient(135deg, #56ab2f 0%, #a8e6cf 100%); }
+        .btn-danger { background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); }
+        .search-section { margin-bottom: 30px; }
+        .search-box { display: flex; gap: 10px; margin-bottom: 20px; }
+        .search-input { flex: 1; padding: 15px; border: 2px solid #ddd; border-radius: 10px; font-size: 1.1em; }
+        .search-input:focus { outline: none; border-color: #4facfe; }
+        .progress-section { display: none; margin-top: 30px; }
+        .progress-bar { width: 100%; height: 20px; background-color: #f0f0f0; border-radius: 10px; overflow: hidden; margin: 20px 0; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%); width: 0%; transition: width 0.3s ease; }
+        .status-text { text-align: center; margin: 10px 0; font-weight: bold; }
+        .alert { padding: 15px; margin: 20px 0; border-radius: 5px; display: none; }
+        .alert-success { background-color: #d4edda; border-color: #c3e6cb; color: #155724; }
+        .alert-error { background-color: #f8d7da; border-color: #f5c6cb; color: #721c24; }
+        .alert-info { background-color: #d1ecf1; border-color: #bee5eb; color: #0c5460; }
+        .results-section { margin-top: 30px; }
+        .result-card { background: #f8f9fa; border-radius: 10px; padding: 20px; margin: 15px 0; border-left: 5px solid #4facfe; transition: all 0.3s ease; cursor: pointer; }
+        .result-card:hover { transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.1); }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px; }
+        .result-title { font-size: 1.2em; font-weight: bold; color: #333; }
+        .result-score { background: #4facfe; color: white; padding: 5px 10px; border-radius: 15px; font-size: 0.9em; }
+        .result-timestamp { color: #666; font-size: 0.9em; }
+        .result-labels { margin-top: 10px; }
+        .label-tag { background: #e3f2fd; color: #1976d2; padding: 3px 8px; border-radius: 10px; font-size: 0.8em; margin: 2px; display: inline-block; }
+        .video-list { display: grid; gap: 20px; }
+        .video-card { background: #f8f9fa; border-radius: 10px; padding: 20px; border-left: 5px solid #28a745; }
+        .video-title { font-size: 1.3em; font-weight: bold; margin-bottom: 10px; }
+        .video-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 10px; margin: 15px 0; }
+        .stat-item { background: white; padding: 10px; border-radius: 5px; text-align: center; }
+        .stat-number { font-size: 1.5em; font-weight: bold; color: #4facfe; }
+        .stat-label { font-size: 0.8em; color: #666; }
+        .loading { text-align: center; padding: 40px; color: #666; }
+        .no-results { text-align: center; padding: 40px; color: #666; }
+        .modal { display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
+        .modal-content { background-color: white; margin: 2% auto; padding: 0; border-radius: 15px; width: 90%; max-width: 1000px; max-height: 90vh; overflow-y: auto; }
+        .modal-header { background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 20px; border-radius: 15px 15px 0 0; }
+        .modal-body { padding: 20px; }
+        .close { color: white; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+        .close:hover { opacity: 0.7; }
+        .frame-analysis { margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; }
+        .frame-title { font-size: 1.1em; font-weight: bold; margin-bottom: 10px; color: #333; }
+        .analysis-section { margin-bottom: 15px; }
+        .section-title { font-weight: bold; color: #4facfe; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎬 AI 동영상 검색 시스템</h1>
+            <p>AWS Bedrock + Rekognition을 활용한 스마트 비디오 분석 및 검색</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="tabs">
+                <button class="tab active" onclick="showTab('upload')">📤 비디오 업로드</button>
+                <button class="tab" onclick="showTab('search')">🔍 AI 검색</button>
+                <button class="tab" onclick="showTab('videos')">📚 비디오 라이브러리</button>
+            </div>
+            
+            <!-- 업로드 탭 -->
+            <div id="upload-tab" class="tab-content active">
+                <div class="upload-section">
+                    <div class="upload-area" id="uploadArea">
+                        <div class="upload-icon">🎬</div>
+                        <div class="upload-text" id="uploadText">
+                            비디오 파일을 드래그하거나 클릭하여 업로드하세요<br>
+                            <small>업로드된 비디오는 AI로 자동 분석됩니다</small>
+                        </div>
+                        <input type="file" id="videoFile" class="file-input" accept="video/*">
+                        <button class="btn" onclick="document.getElementById('videoFile').click()">
+                            파일 선택
+                        </button>
+                    </div>
+                    
+                    <button class="btn" id="uploadBtn" onclick="uploadVideo()" disabled>
+                        AI 분석 시작
+                    </button>
+                </div>
+                
+                <div class="alert" id="uploadAlert"></div>
+                
+                <div class="progress-section" id="progressSection">
+                    <div class="status-text" id="statusText">처리 중...</div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div id="progressPercent" style="text-align: center;">0%</div>
+                </div>
+            </div>
+            
+            <!-- 검색 탭 -->
+            <div id="search-tab" class="tab-content">
+                <div class="search-section">
+                    <h2>🤖 AI 기반 장면 검색</h2>
+                    <p style="margin-bottom: 20px; color: #666;">자연어로 원하는 장면을 검색해보세요. 예: "칼싸움하는 장면", "웃는 사람", "자동차가 나오는 부분"</p>
+                    
+                    <div class="search-box">
+                        <input type="text" id="searchInput" class="search-input" 
+                               placeholder="찾고 싶은 장면을 설명해주세요..." 
+                               onkeypress="if(event.key==='Enter') searchScenes()">
+                        <button class="btn" onclick="searchScenes()">🔍 검색</button>
+                    </div>
+                </div>
+                
+                <div class="alert" id="searchAlert"></div>
+                
+                <div id="searchResults" class="results-section"></div>
+            </div>
+            
+            <!-- 비디오 라이브러리 탭 -->
+            <div id="videos-tab" class="tab-content">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h2>📚 비디오 라이브러리</h2>
+                    <button class="btn" onclick="loadVideos()">🔄 새로고침</button>
+                </div>
+                
+                <div id="videosList" class="video-list"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 상세 정보 모달 -->
+    <div id="detailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="close" onclick="closeModal()">&times;</span>
+                <h2 id="modalTitle">상세 분석 결과</h2>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- 상세 내용이 여기에 로드됩니다 -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let currentJobId = null;
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            loadVideos();
+            setupDragAndDrop();
+        });
+        
+        // 드래그 앤 드롭 설정
+        function setupDragAndDrop() {
+            const uploadArea = document.getElementById('uploadArea');
+            
+            uploadArea.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                uploadArea.classList.add('dragover');
+            });
+            
+            uploadArea.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+            });
+            
+            uploadArea.addEventListener('drop', function(e) {
+                e.preventDefault();
+                uploadArea.classList.remove('dragover');
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0 && files[0].type.startsWith('video/')) {
+                    selectedFile = files[0];
+                    document.getElementById('videoFile').files = files;
+                    updateUploadText();
+                    document.getElementById('uploadBtn').disabled = false;
+                }
+            });
+        }
+        
+        // 파일 선택 처리
+        document.getElementById('videoFile').addEventListener('change', function(e) {
+            selectedFile = e.target.files[0];
+            if (selectedFile) {
+                updateUploadText();
+                document.getElementById('uploadBtn').disabled = false;
+            }
+        });
+        
+        function updateUploadText() {
+            const uploadText = document.getElementById('uploadText');
+            if (selectedFile) {
+                uploadText.innerHTML = `
+                    선택된 파일: <strong>${selectedFile.name}</strong><br>
+                    크기: ${formatFileSize(selectedFile.size)}<br>
+                    <small>AI 분석을 시작하려면 "AI 분석 시작" 버튼을 클릭하세요</small>
+                `;
+            }
+        }
+        
+        // 탭 전환
+        function showTab(tabName) {
+            // 모든 탭과 콘텐츠 비활성화
+            document.querySelectorAll('.tab').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            
+            // 선택된 탭과 콘텐츠 활성화
+            event.target.classList.add('active');
+            document.getElementById(tabName + '-tab').classList.add('active');
+            
+            // 비디오 탭 선택시 목록 새로고침
+            if (tabName === 'videos') {
+                loadVideos();
+            }
+        }
+        
+        // 비디오 업로드
+        function uploadVideo() {
+            if (!selectedFile) {
+                showAlert('uploadAlert', '파일을 선택해주세요.', 'error');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('video', selectedFile);
+            
+            document.getElementById('uploadBtn').disabled = true;
+            document.getElementById('progressSection').style.display = 'block';
+            
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.job_id) {
+                    currentJobId = data.job_id;
+                    showAlert('uploadAlert', '업로드 완료! AI 분석을 시작합니다.', 'success');
+                    checkStatus();
+                } else {
+                    throw new Error(data.error || '업로드 실패');
+                }
+            })
+            .catch(error => {
+                showAlert('uploadAlert', '업로드 실패: ' + error.message, 'error');
+                document.getElementById('uploadBtn').disabled = false;
+                document.getElementById('progressSection').style.display = 'none';
+            });
+        }
+        
+        // 작업 상태 확인
+        function checkStatus() {
+            if (!currentJobId) return;
+            
+            fetch(`/api/status/${currentJobId}`)
+            .then(response => response.json())
+            .then(data => {
+                updateProgress(data);
+                
+                if (data.status === 'completed') {
+                    showAlert('uploadAlert', '🎉 AI 분석 완료! 이제 검색할 수 있습니다.', 'success');
+                    document.getElementById('progressSection').style.display = 'none';
+                    document.getElementById('uploadBtn').disabled = false;
+                    loadVideos(); // 비디오 목록 새로고침
+                    resetUpload();
+                } else if (data.status === 'failed') {
+                    showAlert('uploadAlert', '분석 실패: ' + (data.error || '알 수 없는 오류'), 'error');
+                    document.getElementById('progressSection').style.display = 'none';
+                    document.getElementById('uploadBtn').disabled = false;
+                } else {
+                    setTimeout(checkStatus, 3000); // 3초마다 상태 확인
+                }
+            })
+            .catch(error => {
+                console.error('상태 확인 실패:', error);
+                setTimeout(checkStatus, 5000); // 오류 시 5초 후 재시도
+            });
+        }
+        
+        // 진행률 업데이트
+        function updateProgress(data) {
+            const progress = data.progress || 0;
+            const step = data.step || 'processing';
+            
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressPercent').textContent = progress + '%';
+            
+            const stepTexts = {
+                'initializing': '초기화 중...',
+                'frame_extraction': '프레임 추출 중...',
+                'ai_analysis': 'AI 분석 중...',
+                'saving_metadata': '메타데이터 저장 중...',
+                'finished': '완료!'
+            };
+            
+            document.getElementById('statusText').textContent = stepTexts[step] || '처리 중...';
+        }
+        
+        // 업로드 초기화
+        function resetUpload() {
+            selectedFile = null;
+            currentJobId = null;
+            document.getElementById('videoFile').value = '';
+            document.getElementById('uploadText').innerHTML = `
+                비디오 파일을 드래그하거나 클릭하여 업로드하세요<br>
+                <small>업로드된 비디오는 AI로 자동 분석됩니다</small>
+            `;
+            document.getElementById('uploadBtn').disabled = true;
+        }
+        
+        // 장면 검색
+        function searchScenes() {
+            const query = document.getElementById('searchInput').value.trim();
+            if (!query) {
+                showAlert('searchAlert', '검색어를 입력해주세요.', 'error');
+                return;
+            }
+            
+            const searchResults = document.getElementById('searchResults');
+            searchResults.innerHTML = '<div class="loading">🔍 AI가 장면을 검색하고 있습니다...</div>';
+            
+            fetch('/api/search', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ query: query })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.results) {
+                    displaySearchResults(data);
+                } else {
+                    throw new Error(data.error || '검색 실패');
+                }
+            })
+            .catch(error => {
+                showAlert('searchAlert', '검색 실패: ' + error.message, 'error');
+                searchResults.innerHTML = '';
+            });
+        }
+        
+        // 검색 결과 표시
+        function displaySearchResults(data) {
+            const searchResults = document.getElementById('searchResults');
+            
+            if (data.results.length === 0) {
+                searchResults.innerHTML = `
+                    <div class="no-results">
+                        <h3>검색 결과가 없습니다</h3>
+                        <p>다른 키워드로 검색해보시거나, 먼저 비디오를 업로드해주세요.</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <h3>🎯 검색 결과 (${data.total_results}개)</h3>
+                    <div class="alert alert-info" style="display: block;">
+                        <strong>분석된 질의:</strong> ${data.query_analysis.description || data.query}<br>
+                        <strong>키워드:</strong> ${data.query_analysis.enhanced_keywords.join(', ')}
+                    </div>
+                </div>
+            `;
+            
+            data.results.forEach(result => {
+                html += `
+                    <div class="result-card" onclick="showVideoDetail('${result.video_id}', ${result.timestamp})">
+                        <div class="result-header">
+                            <div class="result-title">📹 ${result.video_name}</div>
+                            <div class="result-score">점수: ${result.score}</div>
+                        </div>
+                        <div class="result-timestamp">
+                            ⏰ ${formatTimestamp(result.timestamp)}
+                        </div>
+                        <div class="result-labels">
+                            ${result.matched_labels.map(label => 
+                                `<span class="label-tag">${label.label} (${label.confidence}%)</span>`
+                            ).join('')}
+                        </div>
+                    </div>
+                `;
+            });
+            
+            searchResults.innerHTML = html;
+        }
+        
+        // 비디오 목록 로드
+        function loadVideos() {
+            const videosList = document.getElementById('videosList');
+            videosList.innerHTML = '<div class="loading">📚 비디오 목록을 불러오는 중...</div>';
+            
+            fetch('/api/videos/list')
+            .then(response => response.json())
+            .then(data => {
+                if (data.videos && data.videos.length > 0) {
+                    displayVideoList(data.videos);
+                } else {
+                    videosList.innerHTML = `
+                        <div class="no-results">
+                            <h3>업로드된 비디오가 없습니다</h3>
+                            <p>먼저 비디오를 업로드하여 AI 분석을 받아보세요.</p>
+                            <button class="btn" onclick="showTab('upload')">비디오 업로드하기</button>
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                videosList.innerHTML = `<div class="alert alert-error" style="display: block;">비디오 목록 로드 실패: ${error.message}</div>`;
+            });
+        }
+        
+        // 비디오 목록 표시
+        function displayVideoList(videos) {
+            const videosList = document.getElementById('videosList');
+            let html = '';
+            
+            videos.forEach(video => {
+                const summary = video.summary || {};
+                html += `
+                    <div class="video-card" onclick="showVideoDetail('${video.job_id}')">
+                        <div class="video-title">📹 ${video.filename}</div>
+                        <div style="color: #666; margin-bottom: 15px;">
+                            처리 완료: ${formatDate(video.processed_at)}
+                        </div>
+                        
+                        <div class="video-stats">
+                            <div class="stat-item">
+                                <div class="stat-number">${video.total_frames}</div>
+                                <div class="stat-label">분석된 프레임</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${summary.total_labels_detected || 0}</div>
+                                <div class="stat-label">감지된 라벨</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${summary.total_faces_detected || 0}</div>
+                                <div class="stat-label">감지된 얼굴</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${summary.unique_labels || 0}</div>
+                                <div class="stat-label">고유 라벨</div>
+                            </div>
+                        </div>
+                        
+                        ${summary.top_labels && summary.top_labels.length > 0 ? `
+                            <div style="margin-top: 15px;">
+                                <strong>주요 라벨:</strong><br>
+                                ${summary.top_labels.slice(0, 8).map(item => 
+                                    `<span class="label-tag">${item.label} (${item.count})</span>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            videosList.innerHTML = html;
+        }
+        
+        // 비디오 상세 정보 표시
+        function showVideoDetail(jobId, highlightTimestamp = null) {
+            document.getElementById('detailModal').style.display = 'block';
+            document.getElementById('modalBody').innerHTML = '<div class="loading">상세 정보를 불러오는 중...</div>';
+            
+            fetch(`/api/video/${jobId}/details`)
+            .then(response => response.json())
+            .then(data => {
+                displayVideoDetail(data, highlightTimestamp);
+            })
+            .catch(error => {
+                document.getElementById('modalBody').innerHTML = 
+                    `<div class="alert alert-error" style="display: block;">상세 정보 로드 실패: ${error.message}</div>`;
+            });
+        }
+        
+        // 비디오 상세 정보 표시
+        function displayVideoDetail(data, highlightTimestamp = null) {
+            document.getElementById('modalTitle').textContent = `📹 ${data.filename} - 상세 분석 결과`;
+            
+            let html = `
+                <div style="margin-bottom: 20px;">
+                    <strong>파일명:</strong> ${data.filename}<br>
+                    <strong>처리 시간:</strong> ${formatDate(data.processed_at)}<br>
+                    <strong>총 프레임:</strong> ${data.total_frames}개
+                </div>
+                
+                <div class="video-stats" style="margin-bottom: 20px;">
+                    <div class="stat-item">
+                        <div class="stat-number">${data.summary.total_labels_detected}</div>
+                        <div class="stat-label">총 라벨</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${data.summary.total_faces_detected}</div>
+                        <div class="stat-label">총 얼굴</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${data.summary.total_texts_detected}</div>
+                        <div class="stat-label">총 텍스트</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-number">${data.summary.unique_labels}</div>
+                        <div class="stat-label">고유 라벨</div>
+                    </div>
+                </div>
+            `;
+            
+            if (data.summary.top_labels && data.summary.top_labels.length > 0) {
+                html += `
+                    <div style="margin-bottom: 20px;">
+                        <h4>🏆 가장 많이 감지된 라벨</h4>
+                        ${data.summary.top_labels.map(item => 
+                            `<span class="label-tag">${item.label} (${item.count}회)</span>`
+                        ).join('')}
+                    </div>
+                `;
+            }
+            
+            html += '<h4>📊 프레임별 분석 결과</h4>';
+            
+            data.frame_analyses.forEach((analysis, index) => {
+                const isHighlighted = highlightTimestamp !== null && 
+                    Math.abs(analysis.timestamp - highlightTimestamp) < 1;
+                
+                html += `
+                    <div class="frame-analysis" ${isHighlighted ? 'style="border: 3px solid #4facfe; background: #f0f8ff;"' : ''}>
+                        <div class="frame-title">
+                            🖼️ 프레임 ${index + 1} - ${formatTimestamp(analysis.timestamp)}
+                            ${isHighlighted ? ' <span style="color: #4facfe;">⭐ 검색 결과</span>' : ''}
+                        </div>
+                        
+                        ${analysis.labels && analysis.labels.length > 0 ? `
+                            <div class="analysis-section">
+                                <div class="section-title">🏷️ 감지된 객체/장면</div>
+                                ${analysis.labels.map(label => 
+                                    `<span class="label-tag">${label.Name} (${label.Confidence}%)</span>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${analysis.faces && analysis.faces.length > 0 ? `
+                            <div class="analysis-section">
+                                <div class="section-title">👤 얼굴 분석</div>
+                                ${analysis.faces.map((face, faceIndex) => `
+                                    <div style="background: white; padding: 8px; margin: 5px 0; border-radius: 5px;">
+                                        <strong>얼굴 ${faceIndex + 1}:</strong> 신뢰도 ${face.Confidence}%<br>
+                                        ${face.AgeRange ? `나이: ${face.AgeRange.Low}-${face.AgeRange.High}세<br>` : ''}
+                                        ${face.Gender ? `성별: ${face.Gender.Value} (${face.Gender.Confidence}%)<br>` : ''}
+                                        ${face.Emotions && face.Emotions.length > 0 ? 
+                                            `감정: ${face.Emotions.map(emotion => 
+                                                `${emotion.Type} (${emotion.Confidence.toFixed(1)}%)`
+                                            ).join(', ')}` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${analysis.text && analysis.text.length > 0 ? `
+                            <div class="analysis-section">
+                                <div class="section-title">📝 감지된 텍스트</div>
+                                ${analysis.text.map(text => 
+                                    `<div style="background: white; padding: 5px; margin: 3px 0; border-radius: 3px;">
+                                        "${text.DetectedText}" (${text.Confidence}%)
+                                    </div>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                        
+                        ${analysis.moderation && analysis.moderation.length > 0 ? `
+                            <div class="analysis-section">
+                                <div class="section-title">⚠️ 콘텐츠 조정</div>
+                                ${analysis.moderation.map(mod => 
+                                    `<span class="label-tag" style="background: #ffebee; color: #c62828;">${mod.Name} (${mod.Confidence}%)</span>`
+                                ).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+            });
+            
+            document.getElementById('modalBody').innerHTML = html;
+        }
+        
+        // 모달 닫기
+        function closeModal() {
+            document.getElementById('detailModal').style.display = 'none';
+        }
+        
+        // 모달 외부 클릭 시 닫기
+        window.onclick = function(event) {
+            const modal = document.getElementById('detailModal');
+            if (event.target == modal) {
+                modal.style.display = 'none';
+            }
+        }
+        
+        // 알림 표시
+        function showAlert(elementId, message, type) {
+            const alertBox = document.getElementById(elementId);
+            alertBox.textContent = message;
+            alertBox.className = `alert alert-${type}`;
+            alertBox.style.display = 'block';
+            
+            setTimeout(() => {
+                alertBox.style.display = 'none';
+            }, 5000);
+        }
+        
+        // 유틸리티 함수들
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+        
+        function formatDate(dateString) {
+            if (!dateString) return 'Unknown';
+            const date = new Date(dateString);
+            return date.toLocaleString('ko-KR', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+        
+        function formatTimestamp(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = Math.floor(seconds % 60);
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+    </script>
+</body>
+</html>
