@@ -45,6 +45,7 @@ class AIVideoSearchProcessor:
         self.s3_client = boto3.client('s3', region_name=AWS_REGION)
         self.rekognition_client = boto3.client('rekognition', region_name=AWS_REGION)
         self.bedrock_client = boto3.client('bedrock-runtime', region_name=AWS_REGION)
+        self.mediaconvert_client = boto3.client("mediaconvert", region_name=AWS_REGION)
         
         # 한국어-영어 키워드 매핑
         self.keyword_mapping = {
@@ -76,6 +77,12 @@ class AIVideoSearchProcessor:
             "산": ["mountain", "hill", "landscape"],
             "도시": ["city", "urban", "building", "street"],
             "공원": ["park", "garden", "outdoor"],
+            # 사람 관련
+            "여자": ["woman", "female", "girl", "lady"],
+            "남자": ["man", "male", "boy", "gentleman"],
+            "혼자": ["alone", "single", "solo", "one person"],
+            "둘이": ["two people", "couple", "pair", "duo"],
+            "여러명": ["multiple people", "group", "crowd", "many people"],
         }
     
     def extract_frames_smart(self, video_path, fps=0.5):
@@ -633,3 +640,70 @@ def get_video_details(job_id):
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=8082, debug=False)
+
+@app.route('/api/convert_quality', methods=['POST'])
+def convert_quality():
+    """화질 변환 API"""
+    try:
+        data = request.get_json()
+        video_key = data.get('video_key')
+        target_quality = data.get('target_quality', 'SD')
+        
+        if not video_key:
+            return jsonify({"error": "비디오 키가 필요합니다"}), 400
+        
+        # S3 경로 설정
+        input_s3_path = f"s3://{S3_BUCKET}/{video_key}"
+        output_s3_path = f"s3://{S3_BUCKET}/converted/"
+        
+        # MediaConvert 작업 생성 (간단한 버전)
+        try:
+            endpoints = processor.mediaconvert_client.describe_endpoints()
+            endpoint = endpoints['Endpoints'][0]['Url']
+            mediaconvert_client = boto3.client('mediaconvert', 
+                                             region_name=AWS_REGION,
+                                             endpoint_url=endpoint)
+            
+            job_settings = {
+                "Role": "arn:aws:iam::052402487676:role/MediaConvertServiceRole",
+                "Settings": {
+                    "Inputs": [{
+                        "FileInput": input_s3_path
+                    }],
+                    "OutputGroups": [{
+                        "Name": "File Group",
+                        "OutputGroupSettings": {
+                            "Type": "FILE_GROUP_SETTINGS",
+                            "FileGroupSettings": {
+                                "Destination": output_s3_path
+                            }
+                        },
+                        "Outputs": [{
+                            "NameModifier": "_SD",
+                            "VideoDescription": {
+                                "Width": 720,
+                                "Height": 480
+                            },
+                            "ContainerSettings": {
+                                "Container": "MP4"
+                            }
+                        }]
+                    }]
+                }
+            }
+            
+            response = mediaconvert_client.create_job(**job_settings)
+            job_id = response['Job']['Id']
+            
+            return jsonify({
+                "success": True,
+                "job_id": job_id,
+                "message": "화질 변환 작업이 시작되었습니다"
+            })
+            
+        except Exception as e:
+            return jsonify({"error": f"MediaConvert 작업 생성 실패: {str(e)}"}), 500
+            
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
